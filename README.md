@@ -15,7 +15,7 @@ Install requirements
 python3 -m pip install -r requirements.txt
 ```
 
-Set up the output and trim repos
+Set up the output and trim directories
 ```sh
 mkdir -pv ./outputs ./sounds
 ```

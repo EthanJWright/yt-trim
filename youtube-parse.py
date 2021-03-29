@@ -72,22 +72,27 @@ def write_new_file(extracted_song, new_file_name):
 
 
 def out_path(repo, filename):
+    """full path for file being downloaded"""
     return f"{YOUTUBE_OUT}{repo}/{filename}"
 
 
 def trim_dir(repo):
+    """directory that trimmed files are saved in"""
     return f"{TRIM_OUT}{repo}/"
 
 
 def trim_path(repo, filename):
+    """full path for file being trimmed to be saved"""
     return f"{trim_dir(repo)}{filename}"
 
 
 def mkdir_pv(ensure_dir):
+    """make a directory if it doesn't exist"""
     Path(ensure_dir).mkdir(parents=True, exist_ok=True)
 
 
 def trim_output(repo, duration=None):
+    """trim all files in a repo"""
     if duration is None:
         duration = 1
 
@@ -102,7 +107,8 @@ def trim_output(repo, duration=None):
             print(f"Trimmed -- [{filename}]")
 
 
-def download_playlist(id=None, output_dir=""):
+def download_playlist(playlist_id=None, output_dir=""):
+    """download a youtube playlist"""
     yt_log = MyLogger()
     ydl_opts = {
         "format": "bestaudio/best",
@@ -115,13 +121,13 @@ def download_playlist(id=None, output_dir=""):
         ],
         "logger": yt_log,
         "progress_hooks": [my_hook],
-        "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(id)s.%(ext)s",
+        "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(playlist_id)s.%(ext)s",
         "restrictfilenames": True,
         "noplaylist": True,
     }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([id])
+        ydl.download([playlist_id])
     return yt_log.download_repos
 
 
@@ -132,11 +138,13 @@ def main():
         prog="Download youtube videos as trimmed MP3s", usage="%(prog)s [--playlist]"
     )
 
-    parser.add_argument("--playlist")
-    parser.add_argument("--duration", type=int)
+    parser.add_argument("--playlist", help="playlist_id of the playlist to download")
+    parser.add_argument(
+        "--duration", type=int, help="Duration of output file, in minutes"
+    )
     args = parser.parse_args()
 
-    repos = download_playlist(id=args.playlist, output_dir=YOUTUBE_OUT)
+    repos = download_playlist(playlist_id=args.playlist, output_dir=YOUTUBE_OUT)
 
     for repo in repos:
         trim_output(repo, args.duration)
