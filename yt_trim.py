@@ -12,7 +12,7 @@ YOUTUBE_OUT = "./outputs/"
 TRIM_OUT = "./sounds/"
 
 
-class MyLogger:
+class YoutubeDLLogger:
     """Print youtube DL logs"""
 
     def __init__(self):
@@ -117,7 +117,7 @@ class YouTube:
 
     def download_playlist(self, playlist_id=None, output_dir=""):
         """download a youtube playlist"""
-        yt_log = MyLogger()
+        yt_log = YoutubeDLLogger()
         ydl_opts = {
             "format": "bestaudio/best",
             "postprocessors": [
