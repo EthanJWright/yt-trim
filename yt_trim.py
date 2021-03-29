@@ -2,7 +2,7 @@
 from urllib.error import HTTPError
 import sys
 import re
-from os import walk
+import os
 from pathlib import Path
 import argparse
 import shutil
@@ -55,6 +55,12 @@ class YouTube:
         self.__filename_map_hooks = [self.__remove_after_dash]
         self.__done_hooks = [self.__delete_process_dir]
         self.__output_dir = ""
+        self.__duration = 0
+        self.__out_dir = ""
+
+    def set_out(self, directory):
+        """set output dir"""
+        self.__out_dir = directory
 
     @staticmethod
     def __delete_process_dir(output_dir=""):
@@ -66,12 +72,40 @@ class YouTube:
         self.__filename_map_hooks.append(method)
 
     @staticmethod
+    def __prune(path):
+        print(f"Pruning MP3 and MP4 from [{path}]")
+        for root, dirs, files in os.walk(path):
+            del dirs
+            for current_file in files:
+                exts = (".mp3", ".mp4")
+                if current_file.lower().endswith(exts):
+                    os.remove(os.path.join(root, current_file))
+
+    @staticmethod
     def __remove_after_dash(file):
         dash_split = file.split("-")
         return f"{dash_split[0]}.mp3"
 
+    def __trim_downloaded_file(self, filename, out_dir, repo, duration):
+        if "mp3" in filename:
+            audio = self.__trim_file(
+                self.__out_path(out=out_dir, repo=repo, filename=filename),
+                end=duration,
+            )
+            self.__mkdir_pv(self.__trim_dir(repo))
+            # change output filename based on loaded methods
+            filename = self.__process_filename(filename)
+            self.__write_new_file(audio, self.__trim_path(repo, filename))
+            print(f"Processed -- [{filename}]")
+
     @staticmethod
-    def dl_hook(data):
+    def __extract_ytdl_fileprops(filename):
+        props = filename.split("/")
+        file = props[3].split(".")[0]
+        # out_dir, repo, filename
+        return (f"./{props[1]}/", f"{props[2]}/", f"{file}.mp3")
+
+    def dl_hook(self, data):
         """Handle youtubedl finishing download"""
         if "_percent_str" in data:
             percent = data["_percent_str"]
@@ -79,7 +113,9 @@ class YouTube:
             print(f"{percent}%...")
 
         if data["status"] == "finished":
-            print(f"Downloaded {data['filename']}")
+            (out_dir, repo, _) = self.__extract_ytdl_fileprops(data["filename"])
+            self.trim_output(out_dir, repo, self.__duration)
+            self.__prune(f"{out_dir}{repo}")
 
     @staticmethod
     def __min_to_mili(time):
@@ -133,7 +169,7 @@ class YouTube:
             filename = method(filename)
         return filename
 
-    def trim_output(self, out_dir, repo, duration=None):
+    def trim_output(self, out_dir, repo, duration):
         """trim all files in a repo"""
         if duration is None:
             duration = 1
@@ -143,21 +179,14 @@ class YouTube:
         else:
             print("Copying files to destination...")
         path = f"{out_dir}{repo}"
-        _, _, filenames = next(walk(path))
+        _, _, filenames = next(os.walk(path))
         for filename in filenames:
-            if "mp3" in filename:
-                audio = self.__trim_file(
-                    self.__out_path(out=out_dir, repo=repo, filename=filename),
-                    end=duration,
-                )
-                self.__mkdir_pv(self.__trim_dir(repo))
-                # change output filename based on loaded methods
-                filename = self.__process_filename(filename)
-                self.__write_new_file(audio, self.__trim_path(repo, filename))
-                print(f"Processed -- [{filename}]")
+            self.__trim_downloaded_file(filename, out_dir, repo, duration)
 
-    def download(self, source_id=None, output_dir=""):
+    def download(self, source_id=None, output_dir="", duration=0):
         """download youtube audio from a source"""
+        if duration is not None:
+            self.__duration = duration
         yt_log = YoutubeDLLogger()
         self.__output_dir = output_dir
         ydl_opts = {
@@ -202,15 +231,15 @@ def main():
     args = parser.parse_args()
 
     youtube = YouTube()
+    youtube.set_out(YOUTUBE_OUT)
 
     try:
-        repos = youtube.download(source_id=args.source, output_dir=YOUTUBE_OUT)
+        youtube.download(
+            source_id=args.source, output_dir=YOUTUBE_OUT, duration=args.duration
+        )
     except HTTPError:
         print("Cant download video, exiting...")
         sys.exit()
-
-    for repo in repos:
-        youtube.trim_output(YOUTUBE_OUT, f"{repo}/", args.duration)
 
     youtube.done()
 
