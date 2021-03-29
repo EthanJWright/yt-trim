@@ -45,6 +45,8 @@ class YoutubeDLLogger:
 
 
 class YouTube:
+    """manage API for downloading and processing files"""
+
     @staticmethod
     def dl_hook(data):
         """Handle youtubedl finishing download"""
