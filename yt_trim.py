@@ -4,7 +4,6 @@ from os import walk
 from pathlib import Path
 import argparse
 import youtube_dl
-import sys
 
 from pydub import AudioSegment
 
@@ -50,7 +49,6 @@ def my_hook(data):
     if "_percent_str" in data:
         percent = data["_percent_str"]
         percent = percent.replace("%", "")
-        sys.stdout.flush()
         print(f"{percent}%...")
 
     if data["status"] == "finished":
