@@ -5,6 +5,8 @@ from pathlib import Path
 import argparse
 import youtube_dl
 
+from urllib.error import HTTPError
+
 from pydub import AudioSegment
 
 
@@ -47,6 +49,18 @@ class YoutubeDLLogger:
 class YouTube:
     """manage API for downloading and processing files"""
 
+    def __init__(self):
+        self.__filename_map_methods = [self.__remove_after_dash]
+
+    def add_filename_map(self, method):
+        """add a method to process file names"""
+        self.__filename_map_methods.append(method)
+
+    @staticmethod
+    def __remove_after_dash(file):
+        dash_split = file.split("-")
+        return f"{dash_split[0]}.mp3"
+
     @staticmethod
     def dl_hook(data):
         """Handle youtubedl finishing download"""
@@ -73,19 +87,28 @@ class YouTube:
         return song[start_time:end_time]
 
     @staticmethod
-    def __write_new_file(extracted_song, new_file_name):
+    def __write_new_file(extracted_song, new_file):
         """write a trimmed file to a new file"""
-        extracted_song.export(new_file_name, format="mp3")
+        print(f"Writing file to: {new_file}")
+        extracted_song.export(new_file, format="mp3")
 
     @staticmethod
-    def __out_path(out=YOUTUBE_OUT, repo="", filename=""):
+    def __path(out, repo):
+        return f"{out}{repo}"
+
+    @staticmethod
+    def __no_repo_path(out):
+        return out
+
+    def __out_path(self, out=YOUTUBE_OUT, repo="", filename=""):
         """full path for file being downloaded"""
-        return f"{out}{repo}/{filename}"
+        return f"{self.__path(out, repo)}{filename}"
 
-    @staticmethod
-    def __trim_dir(repo):
+    def __trim_dir(self, repo):
         """directory that trimmed files are saved in"""
-        return f"{TRIM_OUT}{repo}/"
+        if repo == "NA/":
+            return self.__no_repo_path(TRIM_OUT)
+        return self.__path(TRIM_OUT, repo)
 
     def __trim_path(self, repo, filename):
         """full path for file being trimmed to be saved"""
@@ -95,6 +118,11 @@ class YouTube:
     def __mkdir_pv(ensure_dir):
         """make a directory if it doesn't exist"""
         Path(ensure_dir).mkdir(parents=True, exist_ok=True)
+
+    def __process_filename(self, filename):
+        for method in self.__filename_map_methods:
+            filename = method(filename)
+        return filename
 
     def trim_output(self, out_dir, repo, duration=None):
         """trim all files in a repo"""
@@ -114,6 +142,8 @@ class YouTube:
                     end=duration,
                 )
                 self.__mkdir_pv(self.__trim_dir(repo))
+                # change output filename based on loaded methods
+                filename = self.__process_filename(filename)
                 self.__write_new_file(audio, self.__trim_path(repo, filename))
                 print(f"Processed -- [{filename}]")
 
@@ -155,10 +185,17 @@ def main():
     args = parser.parse_args()
 
     youtube = YouTube()
-    repos = youtube.download_playlist(playlist_id=args.playlist, output_dir=YOUTUBE_OUT)
+
+    try:
+        repos = youtube.download_playlist(
+            playlist_id=args.playlist, output_dir=YOUTUBE_OUT
+        )
+    except HTTPError:
+        print("Cant download video, exiting...")
+        exit(0)
 
     for repo in repos:
-        youtube.trim_output(YOUTUBE_OUT, repo, args.duration)
+        youtube.trim_output(YOUTUBE_OUT, f"{repo}/", args.duration)
 
 
 if __name__ == "__main__":
