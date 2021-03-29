@@ -19,3 +19,8 @@ Set up the output and trim directories
 ```sh
 mkdir -pv ./outputs ./sounds
 ```
+## Using
+
+```sh
+python3 yt_trim.py --playlist=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=1
+```
