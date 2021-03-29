@@ -4,6 +4,7 @@ from os import walk
 from pathlib import Path
 import argparse
 import youtube_dl
+import sys
 
 from pydub import AudioSegment
 
@@ -20,7 +21,6 @@ class MyLogger:
 
     @staticmethod
     def __get_between(msg):
-        print(f"Parsing: {msg}")
         result = re.search("./outputs/(.*)/", msg)
         if result is None:
             return None
@@ -33,8 +33,6 @@ class MyLogger:
                 directory = self.__get_between(msg)
                 if directory is not None and directory not in self.download_repos:
                     self.download_repos.append(directory)
-
-        print(f"Debug: {msg}")
 
     @staticmethod
     def warning(msg):
@@ -49,8 +47,14 @@ class MyLogger:
 
 def my_hook(data):
     """Handle youtubedl finishing download"""
+    if "_percent_str" in data:
+        percent = data["_percent_str"]
+        percent = percent.replace("%", "")
+        sys.stdout.flush()
+        print(f"{percent}%...")
+
     if data["status"] == "finished":
-        print("Done downloading, now converting...")
+        print(f"Downloaded {data['filename']}")
 
 
 def min_to_mili(time):
@@ -71,9 +75,9 @@ def write_new_file(extracted_song, new_file_name):
     extracted_song.export(new_file_name, format="mp3")
 
 
-def out_path(repo, filename):
+def out_path(out=YOUTUBE_OUT, repo="", filename=""):
     """full path for file being downloaded"""
-    return f"{YOUTUBE_OUT}{repo}/{filename}"
+    return f"{out}{repo}/{filename}"
 
 
 def trim_dir(repo):
@@ -91,7 +95,7 @@ def mkdir_pv(ensure_dir):
     Path(ensure_dir).mkdir(parents=True, exist_ok=True)
 
 
-def trim_output(repo, duration=None):
+def trim_output(out_dir, repo, duration=None):
     """trim all files in a repo"""
     if duration is None:
         duration = 1
@@ -101,7 +105,9 @@ def trim_output(repo, duration=None):
     _, _, filenames = next(walk(path))
     for filename in filenames:
         if "mp3" in filename:
-            audio = trim_file(out_path(repo, filename), end=duration)
+            audio = trim_file(
+                out_path(out=out_dir, repo=repo, filename=filename), end=duration
+            )
             mkdir_pv(trim_dir(repo))
             write_new_file(audio, trim_path(repo, filename))
             print(f"Trimmed -- [{filename}]")
@@ -147,7 +153,7 @@ def main():
     repos = download_playlist(playlist_id=args.playlist, output_dir=YOUTUBE_OUT)
 
     for repo in repos:
-        trim_output(repo, args.duration)
+        trim_output(YOUTUBE_OUT, repo, args.duration)
 
 
 if __name__ == "__main__":
