@@ -19,6 +19,7 @@ Set up the output and trim directories
 ```sh
 mkdir -pv ./outputs ./sounds
 ```
+
 ## Using
 
 ```sh
