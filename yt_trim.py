@@ -44,95 +44,99 @@ class MyLogger:
         print(f"Error: {message}")
 
 
-def my_hook(data):
-    """Handle youtubedl finishing download"""
-    if "_percent_str" in data:
-        percent = data["_percent_str"]
-        percent = percent.replace("%", "")
-        print(f"{percent}%...")
+class YouTube:
+    @staticmethod
+    def dl_hook(data):
+        """Handle youtubedl finishing download"""
+        if "_percent_str" in data:
+            percent = data["_percent_str"]
+            percent = percent.replace("%", "")
+            print(f"{percent}%...")
 
-    if data["status"] == "finished":
-        print(f"Downloaded {data['filename']}")
+        if data["status"] == "finished":
+            print(f"Downloaded {data['filename']}")
 
+    @staticmethod
+    def __min_to_mili(time):
+        """convert minutes to miliseconds"""
+        return time * 60 * 1000
 
-def min_to_mili(time):
-    """convert minutes to miliseconds"""
-    return time * 60 * 1000
+    def __trim_file(self, file, start=0, end=0):
+        """trim the length of an audiofile"""
+        start_time = self.__min_to_mili(start)
+        end_time = self.__min_to_mili(end)
+        song = AudioSegment.from_mp3(file)
+        if end == 0:
+            return song
+        return song[start_time:end_time]
 
+    @staticmethod
+    def __write_new_file(extracted_song, new_file_name):
+        """write a trimmed file to a new file"""
+        extracted_song.export(new_file_name, format="mp3")
 
-def trim_file(file, start=0, end=15):
-    """trim the length of an audiofile"""
-    start_time = min_to_mili(start)
-    end_time = min_to_mili(end)
-    song = AudioSegment.from_mp3(file)
-    return song[start_time:end_time]
+    @staticmethod
+    def __out_path(out=YOUTUBE_OUT, repo="", filename=""):
+        """full path for file being downloaded"""
+        return f"{out}{repo}/{filename}"
 
+    @staticmethod
+    def __trim_dir(repo):
+        """directory that trimmed files are saved in"""
+        return f"{TRIM_OUT}{repo}/"
 
-def write_new_file(extracted_song, new_file_name):
-    """write a trimmed file to a new file"""
-    extracted_song.export(new_file_name, format="mp3")
+    def __trim_path(self, repo, filename):
+        """full path for file being trimmed to be saved"""
+        return f"{self.__trim_dir(repo)}{filename}"
 
+    @staticmethod
+    def __mkdir_pv(ensure_dir):
+        """make a directory if it doesn't exist"""
+        Path(ensure_dir).mkdir(parents=True, exist_ok=True)
 
-def out_path(out=YOUTUBE_OUT, repo="", filename=""):
-    """full path for file being downloaded"""
-    return f"{out}{repo}/{filename}"
+    def trim_output(self, out_dir, repo, duration=None):
+        """trim all files in a repo"""
+        if duration is None:
+            duration = 1
 
+        if duration != 1:
+            print(f"Trimming files to duration of {duration} minutes")
+        else:
+            print("Copying files to destination...")
+        path = f"{out_dir}{repo}"
+        _, _, filenames = next(walk(path))
+        for filename in filenames:
+            if "mp3" in filename:
+                audio = self.__trim_file(
+                    self.__out_path(out=out_dir, repo=repo, filename=filename),
+                    end=duration,
+                )
+                self.__mkdir_pv(self.__trim_dir(repo))
+                self.__write_new_file(audio, self.__trim_path(repo, filename))
+                print(f"Processed -- [{filename}]")
 
-def trim_dir(repo):
-    """directory that trimmed files are saved in"""
-    return f"{TRIM_OUT}{repo}/"
+    def download_playlist(self, playlist_id=None, output_dir=""):
+        """download a youtube playlist"""
+        yt_log = MyLogger()
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+            "logger": yt_log,
+            "progress_hooks": [self.dl_hook],
+            "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(playlist_id)s.%(ext)s",
+            "restrictfilenames": True,
+            "noplaylist": True,
+        }
 
-
-def trim_path(repo, filename):
-    """full path for file being trimmed to be saved"""
-    return f"{trim_dir(repo)}{filename}"
-
-
-def mkdir_pv(ensure_dir):
-    """make a directory if it doesn't exist"""
-    Path(ensure_dir).mkdir(parents=True, exist_ok=True)
-
-
-def trim_output(out_dir, repo, duration=None):
-    """trim all files in a repo"""
-    if duration is None:
-        duration = 1
-
-    print(f"Trimming files to duration of {duration} minutes")
-    path = f"{YOUTUBE_OUT}{repo}"
-    _, _, filenames = next(walk(path))
-    for filename in filenames:
-        if "mp3" in filename:
-            audio = trim_file(
-                out_path(out=out_dir, repo=repo, filename=filename), end=duration
-            )
-            mkdir_pv(trim_dir(repo))
-            write_new_file(audio, trim_path(repo, filename))
-            print(f"Trimmed -- [{filename}]")
-
-
-def download_playlist(playlist_id=None, output_dir=""):
-    """download a youtube playlist"""
-    yt_log = MyLogger()
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
-        "logger": yt_log,
-        "progress_hooks": [my_hook],
-        "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(playlist_id)s.%(ext)s",
-        "restrictfilenames": True,
-        "noplaylist": True,
-    }
-
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([playlist_id])
-    return yt_log.download_repos
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([playlist_id])
+        return yt_log.download_repos
 
 
 def main():
@@ -148,10 +152,11 @@ def main():
     )
     args = parser.parse_args()
 
-    repos = download_playlist(playlist_id=args.playlist, output_dir=YOUTUBE_OUT)
+    youtube = YouTube()
+    repos = youtube.download_playlist(playlist_id=args.playlist, output_dir=YOUTUBE_OUT)
 
     for repo in repos:
-        trim_output(YOUTUBE_OUT, repo, args.duration)
+        youtube.trim_output(YOUTUBE_OUT, repo, args.duration)
 
 
 if __name__ == "__main__":
