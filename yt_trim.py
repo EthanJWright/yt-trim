@@ -1,17 +1,20 @@
 """Download and trim youtube audio"""
 import re
 from os import walk
+import os
+import glob
 from pathlib import Path
 import argparse
 import youtube_dl
+import shutil
 
 from urllib.error import HTTPError
 
 from pydub import AudioSegment
 
 
-YOUTUBE_OUT = "./outputs/"
-TRIM_OUT = "./sounds/"
+YOUTUBE_OUT = "./download_temporary_data/"
+TRIM_OUT = "./files/"
 
 
 class YoutubeDLLogger:
@@ -50,11 +53,18 @@ class YouTube:
     """manage API for downloading and processing files"""
 
     def __init__(self):
-        self.__filename_map_methods = [self.__remove_after_dash]
+        self.__filename_map_hooks = [self.__remove_after_dash]
+        self.__done_hooks = [self.__delete_process_dir]
+        self.__output_dir = ""
+
+    @staticmethod
+    def __delete_process_dir(output_dir=""):
+        """delete the directory used to store youtube downloads"""
+        shutil.rmtree(output_dir)
 
     def add_filename_map(self, method):
         """add a method to process file names"""
-        self.__filename_map_methods.append(method)
+        self.__filename_map_hooks.append(method)
 
     @staticmethod
     def __remove_after_dash(file):
@@ -120,7 +130,7 @@ class YouTube:
         Path(ensure_dir).mkdir(parents=True, exist_ok=True)
 
     def __process_filename(self, filename):
-        for method in self.__filename_map_methods:
+        for method in self.__filename_map_hooks:
             filename = method(filename)
         return filename
 
@@ -147,9 +157,10 @@ class YouTube:
                 self.__write_new_file(audio, self.__trim_path(repo, filename))
                 print(f"Processed -- [{filename}]")
 
-    def download_playlist(self, playlist_id=None, output_dir=""):
+    def download(self, source_id=None, output_dir=""):
         """download a youtube playlist"""
         yt_log = YoutubeDLLogger()
+        self.__output_dir = output_dir
         ydl_opts = {
             "format": "bestaudio/best",
             "postprocessors": [
@@ -161,14 +172,18 @@ class YouTube:
             ],
             "logger": yt_log,
             "progress_hooks": [self.dl_hook],
-            "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(playlist_id)s.%(ext)s",
+            "outtmpl": f"{output_dir}%(playlist_title)s/%(title)s-%(source_id)s.%(ext)s",
             "restrictfilenames": True,
             "noplaylist": True,
         }
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([playlist_id])
+            ydl.download([source_id])
         return yt_log.download_repos
+
+    def done(self):
+        for method in self.__done_hooks:
+            method(self.__output_dir)
 
 
 def main():
@@ -178,7 +193,9 @@ def main():
         prog="Download youtube videos as trimmed MP3s", usage="%(prog)s [--playlist]"
     )
 
-    parser.add_argument("--playlist", help="playlist_id of the playlist to download")
+    parser.add_argument(
+        "--source", help="Youtube ID of source, video ID or playlist ID"
+    )
     parser.add_argument(
         "--duration", type=int, help="Duration of output file, in minutes"
     )
@@ -187,15 +204,15 @@ def main():
     youtube = YouTube()
 
     try:
-        repos = youtube.download_playlist(
-            playlist_id=args.playlist, output_dir=YOUTUBE_OUT
-        )
+        repos = youtube.download(source_id=args.source, output_dir=YOUTUBE_OUT)
     except HTTPError:
         print("Cant download video, exiting...")
         exit(0)
 
     for repo in repos:
         youtube.trim_output(YOUTUBE_OUT, f"{repo}/", args.duration)
+
+    youtube.done()
 
 
 if __name__ == "__main__":

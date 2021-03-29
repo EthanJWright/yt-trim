@@ -23,5 +23,5 @@ mkdir -pv ./outputs ./sounds
 ## Using
 
 ```sh
-python3 yt_trim.py --playlist=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=1
+python3 yt_trim.py --source=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=1
 ```
