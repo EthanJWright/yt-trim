@@ -15,13 +15,19 @@ Install requirements
 python3 -m pip install -r requirements.txt
 ```
 
-Set up the output and trim directories
-```sh
-mkdir -pv ./outputs ./sounds
-```
-
 ## Using
 
 ```sh
-python3 yt_trim.py --source=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=1
+python3 yt_trim.py --source=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=15
+```
+
+```sh
+
+$ python3 yt_trim.py --help
+usage: Download youtube videos as trimmed MP3s [--playlist]
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --source SOURCE      Youtube ID of source, video ID or playlist ID
+  --duration DURATION  Duration of output file, in minutes
 ```
