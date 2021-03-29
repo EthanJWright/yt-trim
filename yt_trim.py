@@ -1,14 +1,13 @@
 """Download and trim youtube audio"""
+from urllib.error import HTTPError
+import sys
 import re
 from os import walk
-import os
-import glob
 from pathlib import Path
 import argparse
-import youtube_dl
 import shutil
+import youtube_dl
 
-from urllib.error import HTTPError
 
 from pydub import AudioSegment
 
@@ -158,7 +157,7 @@ class YouTube:
                 print(f"Processed -- [{filename}]")
 
     def download(self, source_id=None, output_dir=""):
-        """download a youtube playlist"""
+        """download youtube audio from a source"""
         yt_log = YoutubeDLLogger()
         self.__output_dir = output_dir
         ydl_opts = {
@@ -182,6 +181,7 @@ class YouTube:
         return yt_log.download_repos
 
     def done(self):
+        """youtube methods complete, clean up"""
         for method in self.__done_hooks:
             method(self.__output_dir)
 
@@ -207,7 +207,7 @@ def main():
         repos = youtube.download(source_id=args.source, output_dir=YOUTUBE_OUT)
     except HTTPError:
         print("Cant download video, exiting...")
-        exit(0)
+        sys.exit()
 
     for repo in repos:
         youtube.trim_output(YOUTUBE_OUT, f"{repo}/", args.duration)
