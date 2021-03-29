@@ -234,12 +234,15 @@ def main():
     youtube.set_out(YOUTUBE_OUT)
 
     try:
-        youtube.download(
+        repos = youtube.download(
             source_id=args.source, output_dir=YOUTUBE_OUT, duration=args.duration
         )
     except HTTPError:
         print("Cant download video, exiting...")
         sys.exit()
+
+    for repo in repos:
+        youtube.trim_output(YOUTUBE_OUT, repo, args.duration)
 
     youtube.done()
 
