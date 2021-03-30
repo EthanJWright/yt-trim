@@ -8,7 +8,16 @@ class Convert:
 
     def __init__(self, output_dir=""):
         self.__output_dir = output_dir
-        self.__filename_map_hooks = [self.__remove_after_dash]
+        self.__filename_map_hooks = [
+            self.__remove_after_dash,
+            self.__remove_duplicate_mp3,
+        ]
+
+    @staticmethod
+    def __remove_duplicate_mp3(file):
+        # TODO: debug sometimes double mp3
+        return file
+        # return file.replace("mp3", "")
 
     @staticmethod
     def __remove_after_dash(file):
