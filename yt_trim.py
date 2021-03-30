@@ -6,12 +6,12 @@ import re
 import os
 from pathlib import Path
 import argparse
+import threading
 import shutil
 import youtube_dl
 from pydub import AudioSegment
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
-import threading
 
 from convert import Convert
 
@@ -34,7 +34,8 @@ class ModifiedDoneThread(threading.Thread):
             time.sleep(1)
             now = time.time()
             remove_timers = []
-            for (key, value) in self.__modified_timers.items():
+            for key in list(self.__modified_timers):
+                value = self.__modified_timers[key]
                 last_modified = value["last_modified"]
                 if now - last_modified > 1:
                     print(f"calling ({len(self.__handlers)}) handlers")
@@ -47,11 +48,14 @@ class ModifiedDoneThread(threading.Thread):
 
 
 class FileObserver:
-    def __init__(self, directory="./", patterns=["*.mp3"], case_sensitive=True):
+    """API to watch for files being downloaded"""
+
+    def __init__(self, directory="./", patterns=None, case_sensitive=True):
+        if patterns is None:
+            patterns = ["*.mp3"]
         self.__on_handlers = {"on_modified_done": []}
         self.__directory = directory
         self.__handler = PatternMatchingEventHandler(patterns, "", True, case_sensitive)
-        self.__recursive = True
         self.__observer = Observer()
         self.__watching = False
         self.__modified_timers = {}
@@ -70,7 +74,6 @@ class FileObserver:
             self.__on_handlers[event] = [handler]
 
     def __on_created(self, event):
-        print(f"in on created!")
         if "on_created" in self.__on_handlers:
             for handler in self.__on_handlers["on_created"]:
                 handler(event)
@@ -104,12 +107,12 @@ class FileObserver:
         self.__watching = True
         self.__handler.on_created = self.__on_created
         self.__handler.on_modified = self.__on_modified
-        self.__observer.schedule(self.__handler, self.__directory, self.__recursive)
+        self.__observer.schedule(self.__handler, self.__directory, True)
         self.__observer.start()
 
     def stop(self):
         """Stop observing the file system"""
-        print(f"Stop called")
+        print("Shutting down file observation...")
         self.__modified_thread.join()
         self.__observer.stop()
         self.__observer.join()
@@ -153,21 +156,26 @@ class YouTube:
 
     def __init__(self):
         self.__filename_map_hooks = [self.__remove_after_dash]
-        # self.__done_hooks = [self.__delete_process_dir]
-        self.__done_hooks = []
+        self.__done_hooks = [self.__delete_process_dir]
+        # self.__done_hooks = []
         self.__duration = 0
-        self.__converter = Convert()
+        self.__converter = Convert(output_dir="./files/")
         self.__temporary_dir = "./download_temporary_data/"
         self.__file_observer = FileObserver(self.__temporary_dir, patterns=["*.mp3"])
         self.__file_observer.load_handler(
             "on_modified_done", self.on_file_done_modified
         )
 
+    def set_processed_dir(self, directory):
+        """set what directory processed files should be placed in"""
+        self.__converter.set_output_dir(directory)
+
     def set_temporary_dir(self, directory):
         """set output dir"""
         self.__temporary_dir = directory
 
     def convert_downloads(self):
+        """configure youtube to wait for files to be downloaded, then run converters on them"""
         self.__file_observer.start()
 
     @staticmethod
@@ -198,16 +206,6 @@ class YouTube:
         """full path for file being downloaded"""
         return f"{self.__temporary_dir}{repo}{filename}"
 
-    def __trim_downloaded_file(self, filename, out_dir, repo, duration):
-        print(f"Trimming file: {filename}")
-        if "mp3" in filename:
-            file_path = self.__temporary_data_path(repo, filename)
-            audio = self.__converter.trim(file_path, duration)
-            filename = self.__converter.process_filename(filename)
-            # change output filename based on loaded methods
-            self.__converter.write(repo, audio, filename)
-            print(f"Processed -- [{filename}]")
-
     @staticmethod
     def __extract_ytdl_fileprops(filename):
         props = filename.split("/")
@@ -216,14 +214,15 @@ class YouTube:
         return (f"./{props[1]}/", f"{props[2]}/", f"{file}.mp3")
 
     def on_file_done_modified(self, event):
-        print(f"IN FILE DONE MODIFIED {event.src_path}")
+        """bind action to when a file is done being modified (video fully downloaded)"""
         full_file = event.src_path
-        (out_dir, repo, filename) = self.__extract_ytdl_fileprops(full_file)
+        (_, repo, filename) = self.__extract_ytdl_fileprops(full_file)
         audio = self.__converter.trim(full_file, self.__duration)
         filename = self.__converter.process_filename(filename)
         self.__converter.write(repo, audio, filename)
 
-    def dl_hook(self, data):
+    @staticmethod
+    def dl_hook(data):
         """Handle youtubedl finishing download"""
         if "_percent_str" in data:
             percent = data["_percent_str"]
@@ -231,81 +230,7 @@ class YouTube:
             print(f"{percent}%...")
 
         if data["status"] == "finished":
-            print(f"Finished download.")
-            # (out_dir, repo, filename) = self.__extract_ytdl_fileprops(full_file)
-            # audio = self.__converter.trim(full_file, self.__duration)
-            # filename = self.__converter.process_filename(filename)
-            # self.__converter.write(repo, audio, filename)
-            # self.__prune(f"{out_dir}{repo}")
-
-    @staticmethod
-    def __min_to_mili(time):
-        """convert minutes to miliseconds"""
-        return time * 60 * 1000
-
-    def __trim_file(self, file, start=0, end=0):
-        """trim the length of an audiofile"""
-        start_time = self.__min_to_mili(start)
-        end_time = self.__min_to_mili(end)
-        song = AudioSegment.from_mp3(file)
-        if end == 0:
-            return song
-        return song[start_time:end_time]
-
-    @staticmethod
-    def __write_new_file(extracted_song, new_file):
-        """write a trimmed file to a new file"""
-        if extracted_song is None:
-            print(f"Couldnt load file, failed to write {new_file}")
-            return
-        print(f"Writing file to: {new_file}")
-        extracted_song.export(new_file, format="mp3")
-
-    @staticmethod
-    def __path(out, repo):
-        return f"{out}{repo}"
-
-    @staticmethod
-    def __no_repo_path(out):
-        return out
-
-    def __out_path(self, out=YOUTUBE_OUT, repo="", filename=""):
-        """full path for file being downloaded"""
-        return f"{self.__path(out, repo)}{filename}"
-
-    def __trim_dir(self, repo):
-        """directory that trimmed files are saved in"""
-        if repo == "NA/":
-            return self.__no_repo_path(TRIM_OUT)
-        return self.__path(TRIM_OUT, repo)
-
-    def __trim_path(self, repo, filename):
-        """full path for file being trimmed to be saved"""
-        return f"{self.__trim_dir(repo)}{filename}"
-
-    @staticmethod
-    def __mkdir_pv(ensure_dir):
-        """make a directory if it doesn't exist"""
-        Path(ensure_dir).mkdir(parents=True, exist_ok=True)
-
-    def __process_filename(self, filename):
-        for method in self.__filename_map_hooks:
-            filename = method(filename)
-        return filename
-
-    def trim_output(self, out_dir, repo, duration):
-        """trim all files in a repo"""
-        if duration is None:
-            duration = 0
-
-        if duration != 0:
-            print(f"Trimming files to duration of {duration} minutes")
-        else:
-            print("Copying files to destination...")
-        path = f"{out_dir}{repo}"
-        _, _, filenames = next(os.walk(path))
-        for filename in filenames:
-            self.__trim_downloaded_file(filename, out_dir, repo, duration)
+            print("Finished download.")
 
     def download(self, source_id=None, output_dir="", duration=0):
         """download youtube audio from a source"""
@@ -335,10 +260,10 @@ class YouTube:
 
     def done(self):
         """youtube methods complete, clean up"""
-        for method in self.__done_hooks:
-            method(self.__temporary_dir)
         if self.__file_observer.is_watching():
             self.__file_observer.stop()
+        for method in self.__done_hooks:
+            method(self.__temporary_dir)
 
 
 def main():
@@ -361,15 +286,12 @@ def main():
     youtube.convert_downloads()
 
     try:
-        repos = youtube.download(
+        youtube.download(
             source_id=args.source, output_dir=YOUTUBE_OUT, duration=args.duration
         )
     except HTTPError:
         print("Cant download video, exiting...")
         sys.exit()
-
-    for repo in repos:
-        youtube.trim_output(YOUTUBE_OUT, repo, args.duration)
 
     youtube.done()
 

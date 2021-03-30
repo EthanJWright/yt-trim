@@ -6,8 +6,8 @@ from pydub import AudioSegment
 class Convert:
     """trim and rename files"""
 
-    def __init__(self):
-        self.__output_dir = ""
+    def __init__(self, output_dir=""):
+        self.__output_dir = output_dir
         self.__filename_map_hooks = [self.__remove_after_dash]
 
     @staticmethod
