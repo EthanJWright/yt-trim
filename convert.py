@@ -15,9 +15,7 @@ class Convert:
 
     @staticmethod
     def __remove_duplicate_mp3(file):
-        # TODO: debug sometimes double mp3
-        return file
-        # return file.replace("mp3", "")
+        return file.replace(".mp3.mp3", ".mp3")
 
     @staticmethod
     def __remove_after_dash(file):
