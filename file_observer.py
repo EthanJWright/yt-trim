@@ -9,7 +9,7 @@ class ModifiedDoneThread(threading.Thread):
 
     def __init__(self, handlers, modified_timers):
         threading.Thread.__init__(self)
-        # dict of tyep { "last_modified": time, "event": event }
+        # dict of type { "last_modified": time, "event": event }
         self.__modified_timers = modified_timers
         self.__handlers = handlers
 
@@ -35,7 +35,7 @@ class FileObserver:
 
     def __init__(self, directory="./", patterns=None, case_sensitive=True):
         if patterns is None:
-            patterns = ["*.mp3"]
+            patterns = []
         self.__on_handlers = {"on_modified_done": []}
         self.__directory = directory
         self.__handler = PatternMatchingEventHandler(patterns, "", True, case_sensitive)
