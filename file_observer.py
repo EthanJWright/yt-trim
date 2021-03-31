@@ -44,6 +44,11 @@ class FileObserver:
         self.__modified_timers = {}
         self.__modified_thread = None
 
+
+    def set_directory(self, directory):
+        """set directory to be ovserved"""
+        self.__directory = directory
+
     @staticmethod
     def __mkdir_pv(ensure_dir):
         """make a directory if it doesn't exist"""

@@ -10,8 +10,6 @@ from convert import Convert
 from file_observer import FileObserver
 
 
-YOUTUBE_OUT = "./download_temporary_data/"
-TRIM_OUT = "./files/"
 
 
 class YoutubeDLLogger:
@@ -54,12 +52,12 @@ class YoutubeDLLogger:
 class YouTube:
     """manage API for downloading and processing files"""
 
-    def __init__(self):
+    def __init__(self, processed_dir="./files/", temporary_dir="./download_temporary_data"):
         self.__filename_map_hooks = [self.__remove_after_dash]
         self.__done_hooks = [self.__delete_process_dir]
         self.__duration = 0
-        self.__converter = Convert(output_dir="./files/")
-        self.__temporary_dir = "./download_temporary_data/"
+        self.__converter = Convert(output_dir=processed_dir)
+        self.__temporary_dir = temporary_dir
         self.__file_observer = FileObserver(self.__temporary_dir, patterns=["*.mp3"])
         self.__file_observer.load_handler(
             "on_modified_done", self.on_file_done_modified
@@ -72,6 +70,7 @@ class YouTube:
     def set_temporary_dir(self, directory):
         """set output dir"""
         self.__temporary_dir = directory
+        self.__file_observer.set_directory(directory)
 
     def convert_downloads(self):
         """configure youtube to wait for files to be downloaded, then run converters on them"""
@@ -119,12 +118,13 @@ class YouTube:
         if data["status"] == "finished":
             print("Finished download.")
 
-    def download(self, source_id=None, output_dir="", duration=0):
+    def download(self, source_id=None, output_dir=None, duration=0):
         """download youtube audio from a source"""
         if duration is not None:
             self.__duration = duration
         yt_log = YoutubeDLLogger()
-        self.set_temporary_dir(output_dir)
+        if output_dir is not None:
+            self.set_temporary_dir(output_dir)
         ydl_opts = {
             "format": "bestaudio/best",
             "postprocessors": [
@@ -168,13 +168,16 @@ def main():
     )
     args = parser.parse_args()
 
+    youtube_out = "./download_temporary_data/"
+    trim_out = "./files/"
     youtube = YouTube()
-    youtube.set_temporary_dir(YOUTUBE_OUT)
+    youtube.set_temporary_dir(youtube_out)
+    youtube.set_processed_dir(trim_out)
     youtube.convert_downloads()
 
     try:
         youtube.download(
-            source_id=args.source, output_dir=YOUTUBE_OUT, duration=args.duration
+            source_id=args.source, duration=args.duration
         )
     except HTTPError:
         print("Cant download video, exiting...")
