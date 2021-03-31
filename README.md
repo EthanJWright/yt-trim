@@ -15,7 +15,7 @@ Install requirements
 python3 -m pip install -r requirements.txt
 ```
 
-## Using
+## Usage
 
 ```sh
 python3 yt_trim.py --source=PLLBJrClJPlWJScARaoX_LIw1n3LiPoZZQ --duration=15
