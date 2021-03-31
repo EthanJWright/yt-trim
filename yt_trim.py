@@ -2,7 +2,6 @@
 from urllib.error import HTTPError
 import sys
 import re
-import os
 import argparse
 import shutil
 import youtube_dl
@@ -28,13 +27,18 @@ class YoutubeDLLogger:
             return None
         return result.group(1)
 
-    def debug(self, msg):
-        """print debug messages"""
+    def __extract_directory_from_debug(self, msg):
+        directory = None
         if "download" in msg:
             if "Destination" in msg:
                 directory = self.__get_between(msg)
-                if directory is not None and directory not in self.download_repos:
-                    self.download_repos.append(directory)
+        return directory
+
+    def debug(self, msg):
+        """called when youtube_dl has a debug message"""
+        directory = self.__extract_directory_from_debug(msg)
+        if directory is not None and directory not in self.download_repos:
+            self.download_repos.append(directory)
 
     @staticmethod
     def warning(msg):
@@ -53,7 +57,6 @@ class YouTube:
     def __init__(self):
         self.__filename_map_hooks = [self.__remove_after_dash]
         self.__done_hooks = [self.__delete_process_dir]
-        # self.__done_hooks = []
         self.__duration = 0
         self.__converter = Convert(output_dir="./files/")
         self.__temporary_dir = "./download_temporary_data/"
@@ -83,24 +86,12 @@ class YouTube:
         """add a method to process file names"""
         self.__filename_map_hooks.append(method)
 
-    @staticmethod
-    def __prune(path):
-        print(f"Pruning MP3 and MP4 from [{path}]")
-        for root, dirs, files in os.walk(path):
-            del dirs
-            for current_file in files:
-                exts = (".mp3", ".mp4")
-                if current_file.lower().endswith(exts):
-                    os.remove(os.path.join(root, current_file))
 
     @staticmethod
     def __remove_after_dash(file):
         dash_split = file.split("-")
         return f"{dash_split[0]}.mp3"
 
-    def __temporary_data_path(self, repo, filename):
-        """full path for file being downloaded"""
-        return f"{self.__temporary_dir}{repo}{filename}"
 
     @staticmethod
     def __extract_ytdl_fileprops(filename):
