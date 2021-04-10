@@ -20,7 +20,8 @@ class Convert:
     @staticmethod
     def __remove_after_dash(file):
         dash_split = file.split("-")
-        return f"{dash_split[0]}.mp3"
+        dash_split.pop()
+        return f"{''.join(dash_split)}.mp3"
 
     def set_output_dir(self, directory):
         """load the directory to write files to"""

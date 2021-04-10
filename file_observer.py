@@ -4,6 +4,8 @@ import time
 import threading
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
+
+
 class ModifiedDoneThread(threading.Thread):
     """Track when a file hasnt been modified for a second"""
 
@@ -38,12 +40,12 @@ class FileObserver:
             patterns = []
         self.__on_handlers = {"on_modified_done": []}
         self.__directory = directory
-        self.__handler = PatternMatchingEventHandler(patterns, "", True, case_sensitive)
+        self.__handler = PatternMatchingEventHandler(
+            patterns, "", True, case_sensitive)
         self.__observer = Observer()
         self.__watching = False
         self.__modified_timers = {}
         self.__modified_thread = None
-
 
     def set_directory(self, directory):
         """set directory to be ovserved"""

@@ -10,8 +10,6 @@ from convert import Convert
 from file_observer import FileObserver
 
 
-
-
 class YoutubeDLLogger:
     """Print youtube DL logs"""
 
@@ -53,12 +51,12 @@ class YouTube:
     """manage API for downloading and processing files"""
 
     def __init__(self, processed_dir="./files/", temporary_dir="./download_temporary_data"):
-        self.__filename_map_hooks = [self.__remove_after_dash]
         self.__done_hooks = [self.__delete_process_dir]
         self.__duration = 0
         self.__converter = Convert(output_dir=processed_dir)
         self.__temporary_dir = temporary_dir
-        self.__file_observer = FileObserver(self.__temporary_dir, patterns=["*.mp3"])
+        self.__file_observer = FileObserver(
+            self.__temporary_dir, patterns=["*.mp3"])
         self.__file_observer.load_handler(
             "on_modified_done", self.on_file_done_modified
         )
@@ -73,7 +71,10 @@ class YouTube:
         self.__file_observer.set_directory(directory)
 
     def convert_downloads(self):
-        """configure youtube to wait for files to be downloaded, then run converters on them"""
+        """
+        configure youtube to wait for files to be downloaded,
+        then run converters on them
+        """
         self.__file_observer.start()
 
     @staticmethod
@@ -81,16 +82,10 @@ class YouTube:
         """delete the directory used to store youtube downloads"""
         shutil.rmtree(output_dir)
 
-    def add_filename_map(self, method):
-        """add a method to process file names"""
-        self.__filename_map_hooks.append(method)
-
-
     @staticmethod
     def __remove_after_dash(file):
         dash_split = file.split("-")
         return f"{dash_split[0]}.mp3"
-
 
     @staticmethod
     def __extract_ytdl_fileprops(filename):
@@ -100,7 +95,10 @@ class YouTube:
         return (f"./{props[1]}/", f"{props[2]}/", f"{file}.mp3")
 
     def on_file_done_modified(self, event):
-        """bind action to when a file is done being modified (video fully downloaded)"""
+        """
+        bind action to when a file is done being modified
+        (video fully downloaded)
+        """
         full_file = event.src_path
         (_, repo, filename) = self.__extract_ytdl_fileprops(full_file)
         audio = self.__converter.trim(full_file, self.__duration)
@@ -136,7 +134,8 @@ class YouTube:
             ],
             "logger": yt_log,
             "progress_hooks": [self.dl_hook],
-            "outtmpl": f"{self.__temporary_dir}%(playlist_title)s/%(title)s-%(source_id)s.%(ext)s",
+            "outtmpl": f"{self.__temporary_dir}\
+%(playlist_title)s/%(title)s-%(source_id)s.%(ext)s",
             "restrictfilenames": True,
             "noplaylist": True,
         }
@@ -157,7 +156,8 @@ def main():
     """entrypoint"""
 
     parser = argparse.ArgumentParser(
-        prog="Download youtube videos as trimmed MP3s", usage="%(prog)s [--playlist]"
+        prog="Download youtube videos as trimmed MP3s",
+        usage="%(prog)s [--playlist]"
     )
 
     parser.add_argument(
