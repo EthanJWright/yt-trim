@@ -50,7 +50,9 @@ class YoutubeDLLogger:
 class YouTube:
     """manage API for downloading and processing files"""
 
-    def __init__(self, processed_dir="./files/", temporary_dir="./download_temporary_data"):
+    def __init__(self,
+                 processed_dir="./files/",
+                 temporary_dir="./download_temporary_data"):
         self.__done_hooks = [self.__delete_process_dir]
         self.__duration = 0
         self.__converter = Convert(output_dir=processed_dir)
@@ -81,11 +83,6 @@ class YouTube:
     def __delete_process_dir(output_dir=""):
         """delete the directory used to store youtube downloads"""
         shutil.rmtree(output_dir)
-
-    @staticmethod
-    def __remove_after_dash(file):
-        dash_split = file.split("-")
-        return f"{dash_split[0]}.mp3"
 
     @staticmethod
     def __extract_ytdl_fileprops(filename):
